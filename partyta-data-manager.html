@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Manager</title>
+<style>
+:root{
+  --bg:#0a0a0b; --bg2:#101012; --panel:#141416; --panel2:#1a1a1d;
+  --line:#232326; --line2:#2e2e33;
+  --txt:#e9e9ec; --dim:#8b8b94; --dim2:#5f5f68;
+  --acc:#d4a24a; --acc-dim:#6b5222;
+  --ok:#4ac48a; --warn:#e0a63c; --bad:#e05a4a;
+  --r:10px;
+  --ar:"Cairo","Noto Kufi Arabic","Segoe UI","Tahoma",sans-serif;
+  --ui:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--txt);font-family:var(--ui);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,textarea{font-family:inherit;font-size:inherit;color:inherit;background:none;border:none;outline:none}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2a2a2e;border-radius:6px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#3a3a40}
+
+/* ── top bar ───────────────────────────── */
+.top{
+  height:56px;flex:0 0 56px;display:flex;align-items:center;gap:12px;
+  padding:0 16px;background:var(--bg2);border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:.2px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc)}
+.fileinfo{display:flex;align-items:center;gap:8px;min-width:0;color:var(--dim);font-size:13px}
+.fileinfo b{color:var(--txt);font-weight:500;font-family:var(--mono);font-size:12.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.sep{width:1px;height:22px;background:var(--line)}
+.spacer{flex:1}
+.pill{
+  font-size:11px;padding:3px 9px;border-radius:99px;border:1px solid var(--line2);
+  color:var(--dim);white-space:nowrap
+}
+.pill.dirty{color:var(--warn);border-color:#3d2f14;background:#1c1710}
+.pill.saved{color:var(--ok);border-color:#173226;background:#101a16}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;
+  border-radius:8px;border:1px solid var(--line2);background:var(--panel2);
+  color:var(--txt);font-size:13px;font-weight:500;transition:.13s;white-space:nowrap
+}
+.btn:hover{background:#232327;border-color:#3a3a40}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#15100a;font-weight:600}
+.btn.primary:hover{background:#e0af57;border-color:#e0af57}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--dim)}
+.btn.ghost:hover{background:var(--panel2);color:var(--txt)}
+.btn.sm{height:28px;padding:0 10px;font-size:12px}
+.btn.icon{width:32px;padding:0;justify-content:center}
+.btn.icon.sm{width:26px;height:26px}
+
+/* ── layout ────────────────────────────── */
+.main{flex:1;display:flex;min-height:0}
+.side{
+  width:266px;flex:0 0 266px;background:var(--bg2);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0
+}
+.side-h{padding:13px 14px 9px;font-size:10.5px;letter-spacing:1.3px;
+  text-transform:uppercase;color:var(--dim2);font-weight:600;display:flex;
+  justify-content:space-between;align-items:center}
+.search{
+  margin:0 12px 10px;display:flex;align-items:center;gap:8px;height:34px;padding:0 11px;
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;transition:.13s
+}
+.search:focus-within{border-color:var(--acc-dim);background:var(--panel2)}
+.search input{flex:1;min-width:0;font-size:13px}
+.search input::placeholder{color:var(--dim2)}
+.varlist{flex:1;overflow-y:auto;padding:0 8px 14px}
+.varitem{
+  display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:8px;
+  text-align:left;color:var(--dim);transition:.1s;margin-bottom:2px;border:1px solid transparent
+}
+.varitem:hover{background:var(--panel);color:var(--txt)}
+.varitem.on{background:var(--panel2);color:var(--txt);border-color:var(--line2)}
+.varitem.on .vbar{background:var(--acc)}
+.vbar{width:3px;height:22px;border-radius:2px;background:var(--line2);flex:0 0 3px;transition:.1s}
+.vmeta{flex:1;min-width:0}
+.vname{font-family:var(--mono);font-size:12.5px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;display:block}
+.vsub{font-size:11px;color:var(--dim2);display:block;margin-top:1px}
+.vcount{font-size:11px;font-family:var(--mono);color:var(--dim2);
+  background:var(--panel);padding:2px 7px;border-radius:99px;border:1px solid var(--line)}
+.varitem.hit .vcount{color:var(--acc);border-color:var(--acc-dim)}
+
+.content{flex:1;overflow-y:auto;min-width:0;scroll-behavior:smooth}
+.wrap{max-width:1080px;margin:0 auto;padding:22px 26px 120px}
+
+/* ── empty / drop ──────────────────────── */
+.empty{
+  height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;padding:40px;text-align:center
+}
+.drop{
+  width:min(520px,100%);padding:44px 32px;border:2px dashed var(--line2);border-radius:16px;
+  background:var(--bg2);transition:.15s
+}
+.drop.over{border-color:var(--acc);background:#16120a}
+.drop h2{font-size:19px;font-weight:600;margin-bottom:7px}
+.drop p{color:var(--dim);font-size:13px;margin-bottom:20px;line-height:1.7}
+.kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--line2);
+  border-radius:5px;padding:2px 6px;color:var(--dim)}
+
+/* ── header of a variable ──────────────── */
+.vhead{display:flex;align-items:flex-end;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.vhead h1{font-family:var(--mono);font-size:20px;font-weight:600;letter-spacing:-.3px}
+.vhead .tags{display:flex;gap:7px;padding-bottom:4px;flex-wrap:wrap}
+
+/* ── category card ─────────────────────── */
+.cat{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  margin-bottom:12px;overflow:hidden;transition:border-color .13s
+}
+.cat:hover{border-color:var(--line2)}
+.cat.collapsed .cat-body{display:none}
+.cat-h{display:flex;align-items:center;gap:11px;padding:12px 14px;cursor:pointer;user-select:none}
+.cat-h:hover{background:var(--panel2)}
+.chev{color:var(--dim2);transition:transform .15s;flex:0 0 auto}
+.cat.collapsed .chev{transform:rotate(-90deg)}
+.cat-name{flex:1;min-width:0;font-weight:500;font-family:var(--ar);font-size:15px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat-n{font-size:11px;font-family:var(--mono);color:var(--dim2);background:var(--bg2);
+  padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+.cat-acts{display:flex;gap:2px;opacity:0;transition:.12s}
+.cat-h:hover .cat-acts,.cat-acts:focus-within{opacity:1}
+.cat-body{border-top:1px solid var(--line);padding:6px 10px 10px}
+
+/* ── item row ──────────────────────────── */
+.row{
+  display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;
+  transition:background .1s;min-height:36px
+}
+.row:hover{background:var(--panel2)}
+.idx{font-family:var(--mono);font-size:10.5px;color:var(--dim2);width:26px;flex:0 0 26px;
+  text-align:right;user-select:none}
+.txt{flex:1;min-width:0;font-family:var(--ar);font-size:14.5px;line-height:1.6;
+  cursor:text;padding:2px 4px;border-radius:5px;border:1px solid transparent;word-break:break-word}
+.txt:hover{background:var(--bg2)}
+.row.dup .txt{color:var(--warn)}
+.row.dup .idx::after{content:"⧉";margin-left:3px;color:var(--warn)}
+.row-acts{display:flex;gap:2px;opacity:0;transition:.12s;flex:0 0 auto}
+.row:hover .row-acts,.row:focus-within .row-acts{opacity:1}
+.edit-in{
+  flex:1;min-width:0;font-family:var(--ar);font-size:14.5px;background:var(--bg);
+  border:1px solid var(--acc-dim);border-radius:6px;padding:5px 8px
+}
+.jsonbox{
+  flex:1;font-family:var(--mono);font-size:12px;background:var(--bg);border:1px solid var(--line2);
+  border-radius:6px;padding:8px 10px;resize:vertical;min-height:62px;line-height:1.55;color:var(--dim)
+}
+.jsonbox:focus{border-color:var(--acc-dim);color:var(--txt)}
+
+/* ── add bar ───────────────────────────── */
+.addbar{display:flex;gap:7px;padding:8px 8px 4px;margin-top:4px;border-top:1px dashed var(--line)}
+.addbar input{
+  flex:1;min-width:0;height:34px;padding:0 11px;background:var(--bg2);
+  border:1px solid var(--line);border-radius:7px;font-family:var(--ar);font-size:14px;transition:.13s
+}
+.addbar input:focus{border-color:var(--acc-dim);background:var(--bg)}
+.addbar input::placeholder{color:var(--dim2);font-family:var(--ui);font-size:13px}
+.bulk{display:none;padding:8px}
+.bulk.on{display:block}
+.bulk textarea{
+  width:100%;min-height:110px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:7px;padding:10px 12px;font-family:var(--ar);font-size:14px;resize:vertical;line-height:1.75
+}
+.bulk textarea:focus{border-color:var(--acc-dim)}
+.bulk-f{display:flex;gap:8px;align-items:center;margin-top:8px}
+.hint{font-size:11.5px;color:var(--dim2)}
+
+/* ── nested group ──────────────────────── */
+.nest{border-left:2px solid var(--line);margin:4px 0 4px 12px;padding-left:10px}
+.nest-h{display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:12.5px;color:var(--dim);
+  font-family:var(--ar);cursor:pointer;user-select:none}
+.nest-h:hover{color:var(--txt)}
+
+/* ── misc ──────────────────────────────── */
+.note{
+  display:flex;gap:10px;padding:11px 13px;border-radius:8px;background:#16120a;
+  border:1px solid #3a2e14;color:#d6b877;font-size:12.5px;margin-bottom:14px;line-height:1.6
+}
+.note.bad{background:#1a100e;border-color:#3f201b;color:#e0a093}
+.nothing{padding:26px;text-align:center;color:var(--dim2);font-size:13px}
+.toast-wrap{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:60;
+  display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{
+  background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:10px 16px;
+  font-size:13px;box-shadow:0 12px 34px rgba(0,0,0,.6);animation:up .2s ease;max-width:440px
+}
+.toast.ok{border-color:#20402f}.toast.bad{border-color:#42221c;color:#e8a99d}
+@keyframes up{from{opacity:0;transform:translateY(10px)}}
+.foot{
+  position:fixed;bottom:0;left:266px;right:0;height:44px;background:rgba(10,10,11,.93);
+  backdrop-filter:blur(10px);border-top:1px solid var(--line);display:flex;align-items:center;
+  gap:14px;padding:0 26px;font-size:12px;color:var(--dim2);z-index:20
+}
+.foot b{color:var(--dim);font-weight:500;font-family:var(--mono)}
+.hidden{display:none!important}
+@media(max-width:820px){
+  .side{width:200px;flex:0 0 200px}.foot{left:200px}.wrap{padding:18px 16px 110px}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><span class="dot"></span><span>Data Manager</span></div>
+  <div class="sep"></div>
+  <div class="fileinfo" id="fileinfo"><span style="color:var(--dim2)">مفيش ملف متحمّل</span></div>
+  <div class="spacer"></div>
+  <span class="pill hidden" id="status"></span>
+  <button class="btn ghost icon" id="undoBtn" title="تراجع (Ctrl+Z)" disabled>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7v6h6M3 13a9 9 0 1 0 3-7.7L3 8"/></svg>
+  </button>
+  <button class="btn" id="loadBtn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    تحميل ملف
+  </button>
+  <button class="btn primary" id="saveBtn" disabled>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v12m0 0 5-5m-5 5-5-5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    حفظ وتنزيل
+  </button>
+  <input type="file" id="fileInput" accept=".js,.mjs,.cjs,.ts,.json,.txt" class="hidden">
+</div>
+
+<div class="main">
+  <aside class="side">
+    <div class="side-h"><span>المتغيرات</span><span id="varCount"></span></div>
+    <label class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--dim2)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" placeholder="بحث في كل العناصر…" dir="auto">
+      <button class="btn ghost icon sm hidden" id="clearSearch" title="مسح">✕</button>
+    </label>
+    <div class="varlist" id="varlist"></div>
+  </aside>
+
+  <main class="content" id="content">
+    <div class="empty" id="empty">
+      <div class="drop" id="drop">
+        <h2>ارمي ملف الداتا هنا</h2>
+        <p>
+          أي ملف <span class="kbd">.js</span> فيه <span class="kbd">const X = {…}</span>.<br>
+          الملف بيتقري في المتصفح بس — ولا حاجة بتطلع برّه جهازك.
+        </p>
+        <button class="btn primary" id="pickBtn">اختار ملف</button>
+        <p style="margin:18px 0 0;font-size:11.5px">
+          الحفظ بينزّل نسخة جديدة — الأصل مبيتلمسش.
+        </p>
+      </div>
+    </div>
+    <div class="wrap hidden" id="wrap"></div>
+  </main>
+</div>
+
+<div class="foot hidden" id="foot">
+  <span>المتغيرات <b id="f1">0</b></span>
+  <span>الأقسام <b id="f2">0</b></span>
+  <span>العناصر <b id="f3">0</b></span>
+  <span id="f4"></span>
+  <div class="spacer"></div>
+  <span class="hint">Ctrl+S تنزيل · Ctrl+Z تراجع · Ctrl+F بحث</span>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════
+   1. STATE
+   ═══════════════════════════════════════════════════════════════ */
+const S = {
+  src:"",            // original file text, untouched
+  fileName:"",
+  vars:[],           // [{name,kind,start,end,value,quote}]
+  sel:0,
+  dirty:false,
+  undo:[],
+  query:"",
+  collapsed:new Set(),
+  warnings:[]
+};
+const LS = "dm.draft.v1";
+
+/* ═══════════════════════════════════════════════════════════════
+   2. PARSER  —  brace matching, string & comment aware.
+      Never regex-parses the contents; only locates the value span,
+      then evaluates that exact literal.
+   ═══════════════════════════════════════════════════════════════ */
+function matchSpan(src, i){
+  const open = src[i];
+  const close = open === "{" ? "}" : open === "[" ? "]" : null;
+  if(!close) return -1;
+  let depth = 0;
+  for(let p = i; p < src.length; p++){
+    const c = src[p];
+    // strings
+    if(c === "'" || c === '"' || c === "`"){
+      const q = c; p++;
+      while(p < src.length){
+        if(src[p] === "\\"){ p += 2; continue; }
+        if(src[p] === q) break;
+        if(q === "`" && src[p] === "$" && src[p+1] === "{"){        // template hole
+          let d = 1; p += 2;
+          while(p < src.length && d > 0){
+            if(src[p] === "{") d++;
+            else if(src[p] === "}") d--;
+            p++;
+          }
+          continue;
+        }
+        p++;
+      }
+      continue;
+    }
+    // comments
+    if(c === "/" && src[p+1] === "/"){ while(p < src.length && src[p] !== "\n") p++; continue; }
+    if(c === "/" && src[p+1] === "*"){ p += 2; while(p < src.length && !(src[p] === "*" && src[p+1] === "/")) p++; p++; continue; }
+
+    if(c === "{" || c === "[") depth++;
+    else if(c === "}" || c === "]"){
+      depth--;
+      if(depth === 0) return p + 1;
+    }
+  }
+  return -1;
+}
+
+function parseFile(src){
+  const vars = [], warn = [];
+  const re = /(?:^|[\n;}])[ \t]*(?:export[ \t]+)?(const|let|var)[ \t]+([A-Za-z_$][\w$]*)[ \t]*=[ \t\r\n]*/g;
+  let m;
+  while((m = re.exec(src))){
+    const start = re.lastIndex;
+    const ch = src[start];
+    if(ch !== "{" && ch !== "[") continue;           // not a data literal — leave alone
+    const end = matchSpan(src, start);
+    if(end < 0){ warn.push(`${m[2]}: أقواس ناقصة، اتسابت زي ما هي`); continue; }
+    const lit = src.slice(start, end);
+    let value;
+    try{
+      value = (new Function('"use strict";return (' + lit + ');'))();
+    }catch(err){
+      warn.push(`${m[2]}: مش متقري (${err.message}) — اتساب زي ما هو`);
+      re.lastIndex = end; continue;
+    }
+    if(value === null || typeof value !== "object"){ re.lastIndex = end; continue; }
+    const dq = (lit.match(/"/g)||[]).length, sq = (lit.match(/'/g)||[]).length;
+    vars.push({ name:m[2], kind:m[1], start, end, value, quote: dq > sq ? '"' : "'" });
+    re.lastIndex = end;
+  }
+  return { vars, warn };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   3. SERIALIZER  —  back to JS, then spliced into the ORIGINAL
+      text so comments / exports / functions survive byte-for-byte.
+   ═══════════════════════════════════════════════════════════════ */
+function qs(s, q){
+  let o = "";
+  for(const c of String(s)){
+    if(c === "\\") o += "\\\\";
+    else if(c === q) o += "\\" + q;
+    else if(c === "\n") o += "\\n";
+    else if(c === "\r") o += "\\r";
+    else if(c === "\t") o += "\\t";
+    else o += c;
+  }
+  return q + o + q;
+}
+function keyOf(k, q){ return /^[A-Za-z_$][\w$]*$/.test(k) ? k : qs(k, q); }
+
+function ser(v, lvl, q){
+  const pad = "  ".repeat(lvl), pad1 = "  ".repeat(lvl + 1);
+  if(v === null) return "null";
+  if(Array.isArray(v)){
+    if(!v.length) return "[]";
+    return "[\n" + v.map(x => pad1 + ser(x, lvl + 1, q)).join(",\n") + "\n" + pad + "]";
+  }
+  if(typeof v === "object"){
+    const ks = Object.keys(v);
+    if(!ks.length) return "{}";
+    return "{\n" + ks.map(k => pad1 + keyOf(k, q) + ": " + ser(v[k], lvl + 1, q)).join(",\n") + "\n" + pad + "}";
+  }
+  if(typeof v === "string") return qs(v, q);
+  return String(v);
+}
+
+function buildOutput(){
+  let out = S.src;
+  // splice from the end so earlier offsets stay valid
+  [...S.vars].sort((a,b) => b.start - a.start).forEach(v => {
+    out = out.slice(0, v.start) + ser(v.value, 0, v.quote) + out.slice(v.end);
+  });
+  return out;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4. HELPERS
+   ═══════════════════════════════════════════════════════════════ */
+const $  = s => document.querySelector(s);
+const el = (t, c, txt) => { const e = document.createElement(t); if(c) e.className = c; if(txt != null) e.textContent = txt; return e; };
+const isLeaf = v => Array.isArray(v) && v.every(x => typeof x !== "object" || x === null);
+
+function countItems(v){
+  if(Array.isArray(v)) return v.length;
+  if(v && typeof v === "object") return Object.values(v).reduce((n, x) => n + countItems(x), 0);
+  return 1;
+}
+function countCats(v){
+  if(v && !Array.isArray(v) && typeof v === "object") return Object.keys(v).length;
+  return 1;
+}
+function matches(v, q){
+  if(!q) return true;
+  if(typeof v === "string") return v.toLowerCase().includes(q);
+  if(Array.isArray(v)) return v.some(x => matches(x, q));
+  if(v && typeof v === "object")
+    return Object.entries(v).some(([k, x]) => k.toLowerCase().includes(q) || matches(x, q));
+  return String(v).toLowerCase().includes(q);
+}
+function hitCount(v, q){
+  if(!q) return 0;
+  if(typeof v === "string") return v.toLowerCase().includes(q) ? 1 : 0;
+  if(Array.isArray(v)) return v.reduce((n, x) => n + hitCount(x, q), 0);
+  if(v && typeof v === "object") return Object.values(v).reduce((n, x) => n + hitCount(x, q), 0);
+  return 0;
+}
+function getPath(p){ return p.reduce((o, k) => o[k], S.vars[S.sel].value); }
+
+function toast(msg, kind){
+  const t = el("div", "toast " + (kind || ""), msg);
+  $("#toasts").appendChild(t);
+  setTimeout(() => { t.style.transition = ".25s"; t.style.opacity = "0"; setTimeout(() => t.remove(), 260); }, 2400);
+}
+
+function snapshot(){
+  S.undo.push(JSON.stringify(S.vars.map(v => v.value)));
+  if(S.undo.length > 60) S.undo.shift();
+  $("#undoBtn").disabled = false;
+}
+function undo(){
+  if(!S.undo.length) return;
+  const prev = JSON.parse(S.undo.pop());
+  S.vars.forEach((v, i) => v.value = prev[i]);
+  if(!S.undo.length) $("#undoBtn").disabled = true;
+  markDirty(); render();
+  toast("اترجع خطوة");
+}
+function markDirty(){
+  S.dirty = true;
+  const p = $("#status"); p.className = "pill dirty"; p.textContent = "فيه تعديلات مش متنزّلة";
+  p.classList.remove("hidden");
+  saveDraft();
+}
+function saveDraft(){
+  try{
+    localStorage.setItem(LS, JSON.stringify({
+      fileName:S.fileName, src:S.src, values:S.vars.map(v => v.value), at:Date.now()
+    }));
+  }catch(e){ /* quota — الدرافت اختياري */ }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. LOAD
+   ═══════════════════════════════════════════════════════════════ */
+function loadText(text, name){
+  const { vars, warn } = parseFile(text);
+  if(!vars.length){
+    toast("مفيش أي object أو array متعرّف في الملف ده", "bad");
+    return false;
+  }
+  S.src = text; S.fileName = name; S.vars = vars; S.warnings = warn;
+  S.sel = 0; S.dirty = false; S.undo = []; S.query = ""; S.collapsed = new Set();
+  $("#search").value = "";
+  $("#undoBtn").disabled = true;
+  $("#saveBtn").disabled = false;
+  $("#empty").classList.add("hidden");
+  $("#wrap").classList.remove("hidden");
+  $("#foot").classList.remove("hidden");
+  $("#fileinfo").innerHTML = "";
+  $("#fileinfo").append(el("b", "", name),
+    el("span", "", `${(text.length/1024).toFixed(1)} KB`));
+  const p = $("#status"); p.className = "pill saved"; p.textContent = "متحمّل"; p.classList.remove("hidden");
+  render();
+  toast(`اتقري ${vars.length} متغير · ${vars.reduce((n,v)=>n+countItems(v.value),0)} عنصر`, "ok");
+  return true;
+}
+
+function readFile(f){
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = e => loadText(e.target.result, f.name);
+  r.onerror = () => toast("مقدرتش أقرا الملف", "bad");
+  r.readAsText(f, "UTF-8");
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   6. RENDER
+   ═══════════════════════════════════════════════════════════════ */
+function render(){ renderSide(); renderMain(); renderFoot(); }
+
+function renderSide(){
+  const list = $("#varlist"); list.innerHTML = "";
+  $("#varCount").textContent = S.vars.length || "";
+  S.vars.forEach((v, i) => {
+    const hits = hitCount(v.value, S.query);
+    const b = el("button", "varitem" + (i === S.sel ? " on" : "") + (hits ? " hit" : ""));
+    b.appendChild(el("span", "vbar"));
+    const meta = el("div", "vmeta");
+    meta.appendChild(el("span", "vname", v.name));
+    meta.appendChild(el("span", "vsub",
+      Array.isArray(v.value) ? "array" : `${Object.keys(v.value).length} قسم`));
+    b.appendChild(meta);
+    b.appendChild(el("span", "vcount", S.query ? String(hits) : String(countItems(v.value))));
+    b.onclick = () => { S.sel = i; render(); $("#content").scrollTop = 0; };
+    list.appendChild(b);
+  });
+}
+
+function renderFoot(){
+  if(!S.vars.length) return;
+  $("#f1").textContent = S.vars.length;
+  $("#f2").textContent = S.vars.reduce((n, v) => n + countCats(v.value), 0);
+  $("#f3").textContent = S.vars.reduce((n, v) => n + countItems(v.value), 0);
+  const dups = S.vars.reduce((n, v) => n + dupTotal(v.value), 0);
+  $("#f4").innerHTML = dups ? `<span style="color:var(--warn)">مكرر <b style="color:var(--warn)">${dups}</b></span>` : "";
+}
+function dupTotal(v){
+  if(isLeaf(v)){
+    const seen = new Set(); let d = 0;
+    v.forEach(x => { const k = String(x).trim(); if(seen.has(k)) d++; else seen.add(k); });
+    return d;
+  }
+  if(v && typeof v === "object") return Object.values(v).reduce((n, x) => n + dupTotal(x), 0);
+  return 0;
+}
+
+function renderMain(){
+  const w = $("#wrap"); w.innerHTML = "";
+  const v = S.vars[S.sel];
+  if(!v) return;
+
+  // header
+  const h = el("div", "vhead");
+  h.appendChild(el("h1", "", v.name));
+  const tags = el("div", "tags");
+  tags.appendChild(el("span", "pill", `${countCats(v.value)} قسم`));
+  tags.appendChild(el("span", "pill", `${countItems(v.value)} عنصر`));
+  const d = dupTotal(v.value);
+  if(d){ const p = el("span", "pill dirty", `${d} مكرر`); tags.appendChild(p); }
+  h.appendChild(tags);
+  const sp = el("div"); sp.style.flex = "1"; h.appendChild(sp);
+  if(!Array.isArray(v.value)){
+    const add = el("button", "btn sm", "+ قسم جديد");
+    add.onclick = () => {
+      const name = prompt("اسم القسم الجديد:");
+      if(!name || !name.trim()) return;
+      if(name in v.value) return toast("القسم ده موجود", "bad");
+      snapshot(); v.value[name.trim()] = []; markDirty(); render();
+    };
+    h.appendChild(add);
+  }
+  const collapse = el("button", "btn sm ghost", "طيّ الكل");
+  collapse.onclick = () => {
+    const keys = Array.isArray(v.value) ? [] : Object.keys(v.value);
+    const allOpen = keys.every(k => !S.collapsed.has(v.name + "/" + k));
+    keys.forEach(k => allOpen ? S.collapsed.add(v.name + "/" + k) : S.collapsed.delete(v.name + "/" + k));
+    renderMain();
+  };
+  h.appendChild(collapse);
+  w.appendChild(h);
+
+  if(S.warnings.length){
+    const n = el("div", "note");
+    n.innerHTML = "<span>⚠</span><span>" + S.warnings.join("<br>") + "</span>";
+    w.appendChild(n);
+  }
+
+  if(Array.isArray(v.value)){
+    w.appendChild(catCard(v.name, [], v.value, true));
+  }else{
+    const keys = Object.keys(v.value).filter(k => !S.query || k.toLowerCase().includes(S.query) || matches(v.value[k], S.query));
+    if(!keys.length){ w.appendChild(el("div", "nothing", "مفيش نتايج في المتغير ده")); return; }
+    keys.forEach(k => w.appendChild(catCard(k, [k], v.value[k], false)));
+  }
+}
+
+/* ── one category card ── */
+function catCard(name, path, value, isRoot){
+  const v = S.vars[S.sel];
+  const id = v.name + "/" + name;
+  const card = el("div", "cat" + (S.collapsed.has(id) && !S.query ? " collapsed" : ""));
+
+  const head = el("div", "cat-h");
+  head.innerHTML = '<svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+  const nm = el("div", "cat-name", name); nm.dir = "auto";
+  head.appendChild(nm);
+  head.appendChild(el("span", "cat-n", String(countItems(value))));
+
+  const acts = el("div", "cat-acts");
+  if(!isRoot){
+    acts.appendChild(iconBtn("rename", "إعادة تسمية", e => {
+      e.stopPropagation();
+      const nn = prompt("الاسم الجديد:", name);
+      if(!nn || nn === name) return;
+      const obj = getPath(path.slice(0, -1));
+      if(nn in obj) return toast("الاسم ده موجود", "bad");
+      snapshot();
+      const out = {}; Object.keys(obj).forEach(k => out[k === name ? nn : k] = obj[k]);
+      if(path.length === 1) v.value = out; else getPath(path.slice(0, -2))[path[path.length - 2]] = out;
+      markDirty(); render();
+    }));
+    acts.appendChild(iconBtn("trash", "حذف القسم", e => {
+      e.stopPropagation();
+      if(!confirm(`تمسح «${name}» وكل اللي فيه (${countItems(value)} عنصر)؟`)) return;
+      snapshot(); delete getPath(path.slice(0, -1))[name]; markDirty(); render();
+    }));
+  }
+  head.appendChild(acts);
+  head.onclick = () => {
+    if(S.query) return;
+    S.collapsed.has(id) ? S.collapsed.delete(id) : S.collapsed.add(id);
+    card.classList.toggle("collapsed");
+  };
+  card.appendChild(head);
+
+  const body = el("div", "cat-body");
+  body.appendChild(nodeView(path, value));
+  card.appendChild(body);
+  return card;
+}
+
+/* ── recursive body: leaf array, mixed array, or nested object ── */
+function nodeView(path, value){
+  const box = el("div");
+
+  if(isLeaf(value)){
+    box.appendChild(listView(path, value));
+    return box;
+  }
+  if(Array.isArray(value)){                       // array of objects
+    value.forEach((item, i) => {
+      if(typeof item !== "object" || item === null){
+        box.appendChild(strRow(path, i, item, value));
+        return;
+      }
+      const row = el("div", "row"); row.style.alignItems = "flex-start";
+      row.appendChild(el("span", "idx", String(i + 1)));
+      const ta = el("textarea", "jsonbox");
+      ta.value = JSON.stringify(item, null, 2);
+      ta.rows = Math.min(14, ta.value.split("\n").length);
+      ta.onblur = () => {
+        try{
+          const parsed = JSON.parse(ta.value);
+          if(JSON.stringify(parsed) === JSON.stringify(item)) return;
+          snapshot(); getPath(path)[i] = parsed; markDirty(); render();
+        }catch(e){ toast("JSON مش سليم — التعديل اتلغى", "bad"); ta.value = JSON.stringify(item, null, 2); }
+      };
+      row.appendChild(ta);
+      const acts = el("div", "row-acts"); acts.style.opacity = "1";
+      acts.appendChild(iconBtn("trash", "حذف", () => {
+        snapshot(); getPath(path).splice(i, 1); markDirty(); render();
+      }));
+      row.appendChild(acts);
+      box.appendChild(row);
+    });
+    const bar = el("div", "addbar");
+    const b = el("button", "btn sm", "+ عنصر (JSON)");
+    b.onclick = () => {
+      const tmpl = value[0] && typeof value[0] === "object"
+        ? Object.fromEntries(Object.keys(value[0]).map(k => [k, ""])) : {};
+      snapshot(); getPath(path).push(tmpl); markDirty(); render();
+    };
+    bar.appendChild(b); box.appendChild(bar);
+    return box;
+  }
+
+  // nested object
+  Object.keys(value).forEach(k => {
+    if(S.query && !k.toLowerCase().includes(S.query) && !matches(value[k], S.query)) return;
+    const nest = el("div", "nest");
+    const nh = el("div", "nest-h");
+    nh.appendChild(el("span", "", "▸ " + k));
+    nh.appendChild(el("span", "cat-n", String(countItems(value[k]))));
+    const acts = el("div", "cat-acts"); acts.style.opacity = ".6";
+    acts.appendChild(iconBtn("trash", "حذف", e => {
+      e.stopPropagation();
+      if(!confirm(`تمسح «${k}»؟`)) return;
+      snapshot(); delete getPath(path)[k]; markDirty(); render();
+    }));
+    nh.appendChild(acts);
+    nest.appendChild(nh);
+    nest.appendChild(nodeView(path.concat(k), value[k]));
+    box.appendChild(nest);
+  });
+  return box;
+}
+
+/* ── leaf list of strings ── */
+function listView(path, arr){
+  const box = el("div");
+  const counts = {};
+  arr.forEach(x => { const k = String(x).trim(); counts[k] = (counts[k] || 0) + 1; });
+
+  let shown = 0;
+  arr.forEach((item, i) => {
+    if(S.query && !String(item).toLowerCase().includes(S.query)) return;
+    shown++;
+    box.appendChild(strRow(path, i, item, arr, counts[String(item).trim()] > 1));
+  });
+  if(!shown && S.query) box.appendChild(el("div", "nothing", "مفيش نتايج هنا"));
+
+  // add bar
+  const bar = el("div", "addbar");
+  const inp = el("input");
+  inp.placeholder = "اكتب عنصر جديد و اضغط Enter…";
+  inp.dir = "auto";
+  const push = () => {
+    const val = inp.value.trim();
+    if(!val) return;
+    const target = getPath(path);
+    if(target.some(x => String(x).trim() === val)){
+      if(!confirm("العنصر ده موجود قبل كده. تضيفه برضه؟")) return;
+    }
+    snapshot(); target.push(val); markDirty();
+    inp.value = "";
+    render();
+    requestAnimationFrame(restoreFocus);   // keep typing in the same card
+  };
+  inp.onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); push(); } };
+  bar.appendChild(inp);
+  const addB = el("button", "btn sm primary", "إضافة"); addB.onclick = push;
+  bar.appendChild(addB);
+  const bulkB = el("button", "btn sm", "لصق جماعي");
+  bar.appendChild(bulkB);
+  box.appendChild(bar);
+
+  // bulk paste
+  const bulk = el("div", "bulk");
+  const ta = el("textarea");
+  ta.placeholder = "عنصر في كل سطر — الفاضي والمكرر بيتشالوا لوحدهم";
+  ta.dir = "auto";
+  bulk.appendChild(ta);
+  const f = el("div", "bulk-f");
+  const go = el("button", "btn sm primary", "ضيف الكل");
+  const cancel = el("button", "btn sm ghost", "إلغاء");
+  const hint = el("span", "hint", "");
+  f.append(go, cancel, hint);
+  bulk.appendChild(f);
+  box.appendChild(bulk);
+
+  bulkB.onclick = () => { bulk.classList.toggle("on"); if(bulk.classList.contains("on")) ta.focus(); };
+  cancel.onclick = () => { bulk.classList.remove("on"); ta.value = ""; };
+  ta.oninput = () => {
+    const n = ta.value.split("\n").map(s => s.trim()).filter(Boolean).length;
+    hint.textContent = n ? `${n} سطر` : "";
+  };
+  go.onclick = () => {
+    const target = getPath(path);
+    const have = new Set(target.map(x => String(x).trim()));
+    const lines = ta.value.split("\n").map(s => s.trim()).filter(Boolean);
+    const fresh = [];
+    lines.forEach(l => { if(!have.has(l)){ have.add(l); fresh.push(l); } });
+    if(!fresh.length) return toast("كلهم موجودين بالفعل", "bad");
+    snapshot(); target.push(...fresh); markDirty();
+    toast(`اتضاف ${fresh.length}${lines.length - fresh.length ? ` · اتشال ${lines.length - fresh.length} مكرر` : ""}`, "ok");
+    render();
+  };
+  return box;
+}
+
+/* after a re-render, put the caret back in the add-bar nearest the
+   middle of the viewport — so you can type item after item nonstop */
+function restoreFocus(){
+  const bars = [...document.querySelectorAll(".addbar input")];
+  if(!bars.length) return;
+  let best = bars[0], bd = Infinity;
+  bars.forEach(b => {
+    const d = Math.abs(b.getBoundingClientRect().top - window.innerHeight * .55);
+    if(d < bd){ bd = d; best = b; }
+  });
+  best.focus();
+}
+
+function strRow(path, i, item, arr, isDup){
+  const row = el("div", "row" + (isDup ? " dup" : ""));
+  row.appendChild(el("span", "idx", String(i + 1)));
+  const t = el("div", "txt", String(item));
+  t.dir = "auto";
+  t.title = "دوس للتعديل";
+  t.onclick = () => {
+    const inp = el("input", "edit-in");
+    inp.value = String(item); inp.dir = "auto";
+    row.replaceChild(inp, t);
+    inp.focus(); inp.select();
+    const done = save => {
+      if(save && inp.value.trim() && inp.value !== String(item)){
+        snapshot(); getPath(path)[i] = inp.value.trim(); markDirty(); render();
+      }else render();
+    };
+    inp.onkeydown = e => {
+      if(e.key === "Enter"){ e.preventDefault(); done(true); }
+      if(e.key === "Escape"){ e.preventDefault(); done(false); }
+    };
+    inp.onblur = () => done(true);
+  };
+  row.appendChild(t);
+  const acts = el("div", "row-acts");
+  acts.appendChild(iconBtn("copy", "نسخ", () => {
+    navigator.clipboard.writeText(String(item)).then(() => toast("اتنسخ"), () => {});
+  }));
+  acts.appendChild(iconBtn("trash", "حذف", () => {
+    snapshot(); getPath(path).splice(i, 1); markDirty(); render();
+  }));
+  row.appendChild(acts);
+  return row;
+}
+
+const ICONS = {
+  trash:'<path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/>',
+  rename:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>'
+};
+function iconBtn(kind, title, fn){
+  const b = el("button", "btn ghost icon sm");
+  b.title = title;
+  b.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICONS[kind]}</svg>`;
+  b.onclick = fn;
+  return b;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   7. SAVE
+   ═══════════════════════════════════════════════════════════════ */
+function download(){
+  if(!S.vars.length) return;
+  const out = buildOutput();
+  // sanity: the result must still parse as JS before it touches disk
+  try{ new Function(out); }
+  catch(e){
+    if(!confirm("تحذير: الناتج مش بيتقري كـ JS سليم (" + e.message + ").\nتنزّله برضه؟")) return;
+  }
+  const blob = new Blob([out], { type:"text/javascript;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = S.fileName || "data.js";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  S.dirty = false;
+  const p = $("#status"); p.className = "pill saved"; p.textContent = "اتنزّل";
+  toast("اتنزّل " + a.download, "ok");
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8. WIRING
+   ═══════════════════════════════════════════════════════════════ */
+$("#loadBtn").onclick = $("#pickBtn").onclick = () => $("#fileInput").click();
+$("#fileInput").onchange = e => { readFile(e.target.files[0]); e.target.value = ""; };
+$("#saveBtn").onclick = download;
+$("#undoBtn").onclick = undo;
+
+const drop = $("#drop");
+["dragenter","dragover"].forEach(ev => document.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("over");
+}));
+["dragleave","drop"].forEach(ev => document.addEventListener(ev, e => {
+  e.preventDefault();
+  if(ev === "dragleave" && e.relatedTarget) return;
+  drop.classList.remove("over");
+}));
+document.addEventListener("drop", e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if(f) readFile(f);
+});
+
+const sb = $("#search");
+sb.oninput = () => {
+  S.query = sb.value.trim().toLowerCase();
+  $("#clearSearch").classList.toggle("hidden", !S.query);
+  render();
+};
+$("#clearSearch").onclick = () => { sb.value = ""; S.query = ""; $("#clearSearch").classList.add("hidden"); render(); sb.focus(); };
+
+document.addEventListener("keydown", e => {
+  const mod = e.ctrlKey || e.metaKey;
+  if(mod && e.key.toLowerCase() === "s"){ e.preventDefault(); download(); }
+  else if(mod && e.key.toLowerCase() === "z"){
+    if(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    e.preventDefault(); undo();
+  }
+  else if(mod && e.key.toLowerCase() === "f"){ e.preventDefault(); sb.focus(); sb.select(); }
+  else if(e.key === "Escape" && document.activeElement === sb){ $("#clearSearch").click(); }
+});
+
+window.addEventListener("beforeunload", e => {
+  if(S.dirty){ e.preventDefault(); e.returnValue = ""; }
+});
+
+/* restore an unsaved draft */
+(function restore(){
+  let d;
+  try{ d = JSON.parse(localStorage.getItem(LS) || "null"); }catch(e){ return; }
+  if(!d || !d.src) return;
+  const mins = Math.round((Date.now() - d.at) / 60000);
+  const when = mins < 60 ? `من ${mins} دقيقة` : `من ${Math.round(mins/60)} ساعة`;
+  if(!confirm(`فيه شغل مش متنزّل على «${d.fileName}» ${when}.\nترجّعه؟`)){
+    localStorage.removeItem(LS); return;
+  }
+  if(loadText(d.src, d.fileName)){
+    S.vars.forEach((v, i) => { if(d.values[i] !== undefined) v.value = d.values[i]; });
+    markDirty(); render();
+  }
+})();
+</script>
+</body>
+</html>
